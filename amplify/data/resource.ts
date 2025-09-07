@@ -1,17 +1,87 @@
 import { type ClientSchema, a, defineData } from "@aws-amplify/backend";
 
 /*== STEP 1 ===============================================================
-The section below creates a Todo database table with a "content" field. Try
-adding a new "isDone" field as a boolean. The authorization rule below
-specifies that any user authenticated via an API key can "create", "read",
-"update", and "delete" any "Todo" records.
+The section below creates multiple database tables with relationships for 
+managing people, meetings, attendance, and roles in a church (or similar) context.
 =========================================================================*/
+
 const schema = a.schema({
-  Todo: a
+  AttendanceStatus: a.enum(['PRESENT', 'LATE', 'EXCUSED', 'ABSENT']),
+  MeetingRoleType: a.enum(['SPEAKER', 'SHARER', 'WORSHIP_LEADER', 'MODERATOR', 'OTHER']),
+  
+  Person: a
     .model({
-      content: a.string(),
+      fullName: a.string().required(),
+      address: a.string().required(),
+      whatsappE164: a.string().required(),
+      notes: a.string(),
+      tags: a.hasMany('PersonTag', 'personID'),
+      attendances: a.hasMany('Attendance', 'personID'),
+      roles: a.hasMany('MeetingRole', 'personID'),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  Meeting: a
+    .model({
+      meetingDate: a.date().required(),
+      messageTitle: a.string(),
+      notes: a.string(),
+      tags: a.hasMany('MeetingTag', 'meetingID'),
+      attendances: a.hasMany('Attendance', 'meetingID'),
+      roles: a.hasMany('MeetingRole', 'meetingID'),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  Attendance: a
+    .model({
+      status: a.ref('AttendanceStatus'),
+      checkInAt: a.datetime(),
+      checkInBy: a.string(),
+      remarks: a.string(),
+      personID: a.id().required(),
+      meetingID: a.id().required(),
+      person: a.belongsTo('Person', 'personID'),
+      meeting: a.belongsTo('Meeting', 'meetingID'),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  MeetingRole: a
+    .model({
+      roleType: a.ref('MeetingRoleType'),
+      details: a.string(),
+      personID: a.id().required(),
+      meetingID: a.id().required(),
+      person: a.belongsTo('Person', 'personID'),
+      meeting: a.belongsTo('Meeting', 'meetingID'),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  Tag: a
+    .model({
+      name: a.string().required(),
+      tagType: a.string(),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  PersonTag: a
+    .model({
+      assignedAt: a.datetime(),
+      personID: a.id().required(),
+      tagID: a.id().required(),
+      person: a.belongsTo('Person', 'personID'),
+      tag: a.belongsTo('Tag', 'tagID'),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
+  
+  MeetingTag: a
+    .model({
+      assignedAt: a.datetime(),
+      meetingID: a.id().required(),
+      tagID: a.id().required(),
+      meeting: a.belongsTo('Meeting', 'meetingID'),
+      tag: a.belongsTo('Tag', 'tagID'),
+    })
+    .authorization(allow => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
